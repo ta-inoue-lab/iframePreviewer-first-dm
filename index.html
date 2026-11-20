@@ -215,9 +215,16 @@
   <!-- ===== メインプレビューエリア ===== -->
   <div id="main-area">
     <div id="preview-scroll">
-      <!-- 2カラムグリッド（sm以下は1カラム） -->
-      <div class="row row-cols-1 row-cols-sm-2 g-3 p-3">
-        <div class="col" v-for="(src, i) in activeSrcs" :key="'f'+i">
+      <!-- 2カラム固定幅グリッド（列幅 = scaledWidth、小画面では1カラム） -->
+      <div :style="{
+             display: 'grid',
+             gridTemplateColumns: isNarrowScreen ? '1fr' : (scaledWidth + 'px ' + scaledWidth + 'px'),
+             gap: '1rem',
+             padding: '1rem',
+             width: 'max-content',
+             minWidth: '100%'
+           }">
+        <div v-for="(src, i) in activeSrcs" :key="'f'+i">
           <div class="preview-slot">
             <div class="slot-label" :title="src || '(空)'">
               <span class="badge bg-secondary me-1">{{ i+1 }}</span>{{ src || '(URL未設定)' }}
@@ -280,6 +287,7 @@ createApp({
     const frameHeight = ref(720);
     const frameScale  = ref(90);   // ① デフォルト90%
     const isDraggingH = ref(false);
+    const isNarrowScreen = ref(false);
     const activePreset = ref('PC');
     const toastMsg = ref('');
 
@@ -379,12 +387,18 @@ createApp({
       document.removeEventListener('mouseup', stopResizeH);
     }
 
-    onMounted(() => { loadFromParams(); });
+    onMounted(() => {
+      loadFromParams();
+      // ウィンドウ幅を監視して1カラム/2カラムを切替（576px = Bootstrap sm ブレークポイント）
+      const updateNarrow = () => { isNarrowScreen.value = window.innerWidth < 576; };
+      updateNarrow();
+      window.addEventListener('resize', updateNarrow);
+    });
 
     return {
       urls, activeSrcs, frameWidth, frameHeight, frameScale,
       scaledWidth, scaledHeight,
-      isDraggingH, activePreset,
+      isDraggingH, activePreset, isNarrowScreen,
       presets, toastMsg,
       applyUrls, clearUrl, applyPreset, copyShareUrl,
       startResizeH,
