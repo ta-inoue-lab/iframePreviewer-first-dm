@@ -10,31 +10,32 @@
     /* ---- 最小限のカスタムスタイル ---- */
     html, body { height: 100%; background: #f8f9fa; }
 
-    /* コントロールパネル */
     #control-panel { background: #fff; border-bottom: 1px solid #dee2e6; }
 
-    /* iframeラッパー：overflow-xでスクロール可能にし、横幅を中央揃え */
-    #preview-scroll {
-      overflow-x: auto;
-      overflow-y: hidden;
+    #app {
       display: flex;
-      justify-content: flex-start;
-      flex: 1 1 0;
-      min-height: 0;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
     }
 
-    #preview-container {
+    #main-area {
       display: flex;
-      align-items: flex-start;
-      gap: 1rem;
-      padding: 1rem;
-      flex-shrink: 0;
+      flex-direction: column;
+      flex: 1 1 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    #preview-scroll {
+      overflow: auto;
+      flex: 1 1 0;
+      min-height: 0;
     }
 
     .preview-slot {
       display: flex;
       flex-direction: column;
-      flex-shrink: 0;
       min-width: 0;
     }
 
@@ -53,8 +54,7 @@
       background: #fff;
     }
 
-    /* iframeが空のときのプレースホルダー */
-    .preview-slot .iframe-placeholder {
+    .iframe-placeholder {
       border: 1px dashed #ced4da;
       display: flex;
       align-items: center;
@@ -64,18 +64,6 @@
       font-size: .875rem;
     }
 
-    /* リサイズハンドル */
-    #resize-handle {
-      cursor: col-resize;
-      width: 8px;
-      background: #dee2e6;
-      border-radius: 4px;
-      flex-shrink: 0;
-      align-self: stretch;
-      transition: background .15s;
-    }
-    #resize-handle:hover, #resize-handle.dragging { background: #0d6efd; }
-
     /* 高さリサイズハンドル */
     #resize-handle-h {
       cursor: row-resize;
@@ -83,30 +71,12 @@
       background: #dee2e6;
       border-radius: 4px;
       margin: 0 1rem;
+      flex-shrink: 0;
       transition: background .15s;
     }
     #resize-handle-h:hover, #resize-handle-h.dragging { background: #0d6efd; }
 
-    /* レイアウト */
-    #app {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-    }
-
-    #main-area {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 0;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    /* トースト */
     .toast-container { z-index: 1100; }
-
-    /* ハンバーガー展開時のオフキャンバス内 */
     .offcanvas .form-label { font-size: .85rem; }
   </style>
 </head>
@@ -123,7 +93,7 @@
       </span>
 
       <!-- デスクトップ：コントロール群 -->
-      <div class="d-none d-md-flex align-items-center gap-2 flex-wrap flex-grow-1" id="desktop-controls">
+      <div class="d-none d-md-flex align-items-center gap-2 flex-wrap flex-grow-1">
 
         <!-- URL inputs (6個) -->
         <div class="d-flex flex-wrap gap-1 flex-grow-1">
@@ -135,7 +105,7 @@
                 class="form-control form-control-sm"
                 :placeholder="'URL ' + (i+1)"
                 v-model="urls[i]"
-                @keydown.enter="applyUrls"
+                @blur="applyUrls"
               />
               <button class="btn btn-outline-secondary btn-sm px-1" @click="clearUrl(i)" title="クリア">
                 <i class="bi bi-x"></i>
@@ -143,11 +113,6 @@
             </div>
           </template>
         </div>
-
-        <!-- 適用ボタン -->
-        <button class="btn btn-primary btn-sm" @click="applyUrls">
-          <i class="bi bi-play-fill"></i> 表示
-        </button>
 
         <!-- サイズコントロール -->
         <div class="d-flex align-items-center gap-1">
@@ -157,6 +122,10 @@
           <input type="number" class="form-control form-control-sm" style="width:70px;"
                  v-model.number="frameHeight" min="200" max="3000" title="高さ(px)" />
           <span class="text-secondary small">px</span>
+          <span class="text-secondary small ms-1">|</span>
+          <input type="number" class="form-control form-control-sm" style="width:58px;"
+                 v-model.number="frameScale" min="10" max="200" title="スケール(%)" />
+          <span class="text-secondary small">%</span>
         </div>
 
         <!-- プリセットボタン -->
@@ -180,9 +149,6 @@
 
       <!-- モバイル：ハンバーガー -->
       <div class="d-flex d-md-none ms-auto gap-2">
-        <button class="btn btn-primary btn-sm" @click="applyUrls">
-          <i class="bi bi-play-fill"></i>
-        </button>
         <button class="btn btn-outline-info btn-sm" @click="copyShareUrl">
           <i class="bi bi-share"></i>
         </button>
@@ -208,7 +174,7 @@
           <div class="input-group input-group-sm">
             <span class="input-group-text px-1 text-secondary" style="font-size:.7rem;">{{ i+1 }}</span>
             <input type="url" class="form-control form-control-sm"
-                   :placeholder="'URL ' + (i+1)" v-model="urls[i]" />
+                   :placeholder="'URL ' + (i+1)" v-model="urls[i]" @blur="applyUrls" />
             <button class="btn btn-outline-secondary btn-sm px-1" @click="clearUrl(i)">
               <i class="bi bi-x"></i>
             </button>
@@ -217,13 +183,20 @@
       </div>
 
       <p class="form-label fw-semibold mb-1">サイズ（px）</p>
-      <div class="d-flex align-items-center gap-1 mb-3">
+      <div class="d-flex align-items-center gap-1 mb-2">
         <input type="number" class="form-control form-control-sm" style="width:80px;"
                v-model.number="frameWidth" min="200" max="3000" />
         <span class="text-secondary">×</span>
         <input type="number" class="form-control form-control-sm" style="width:80px;"
                v-model.number="frameHeight" min="200" max="3000" />
         <span class="text-secondary small">px</span>
+      </div>
+
+      <p class="form-label fw-semibold mb-1">スケール（%）</p>
+      <div class="d-flex align-items-center gap-1 mb-3">
+        <input type="number" class="form-control form-control-sm" style="width:80px;"
+               v-model.number="frameScale" min="10" max="200" />
+        <span class="text-secondary small">%</span>
       </div>
 
       <p class="form-label fw-semibold mb-1">プリセット</p>
@@ -241,37 +214,35 @@
 
   <!-- ===== メインプレビューエリア ===== -->
   <div id="main-area">
-    <!-- 水平スクロール可能なiframeコンテナ -->
     <div id="preview-scroll">
-      <div id="preview-container" ref="previewContainer">
-        <template v-for="(src, i) in activeSrcs" :key="'f'+i">
+      <!-- 2カラムグリッド（sm以下は1カラム） -->
+      <div class="row row-cols-1 row-cols-sm-2 g-3 p-3">
+        <div class="col" v-for="(src, i) in activeSrcs" :key="'f'+i">
           <div class="preview-slot">
             <div class="slot-label" :title="src || '(空)'">
               <span class="badge bg-secondary me-1">{{ i+1 }}</span>{{ src || '(URL未設定)' }}
             </div>
-            <iframe v-if="src"
-                    :src="src"
-                    :width="frameWidth"
-                    :height="frameHeight"
-                    frameborder="0"
-                    loading="lazy"
-                    sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
-            ></iframe>
-            <div v-else
-                 class="iframe-placeholder"
-                 :style="{ width: frameWidth + 'px', height: frameHeight + 'px' }">
-              <div class="text-center">
-                <i class="bi bi-window-dash fs-3 d-block mb-1"></i>
-                URL未設定
+            <!-- クリッピング枠（スケール後の見た目サイズ） -->
+            <div :style="{ width: scaledWidth + 'px', height: scaledHeight + 'px', overflow: 'hidden', flexShrink: 0 }">
+              <iframe v-if="src"
+                      :src="src"
+                      :width="frameWidth"
+                      :height="frameHeight"
+                      frameborder="0"
+                      loading="lazy"
+                      sandbox="allow-same-origin allow-scripts allow-forms allow-popups"
+                      :style="{ transformOrigin: '0 0', transform: 'scale(' + frameScale/100 + ')', display: 'block' }"
+              ></iframe>
+              <div v-else class="iframe-placeholder"
+                   :style="{ width: scaledWidth + 'px', height: scaledHeight + 'px' }">
+                <div class="text-center">
+                  <i class="bi bi-window-dash fs-3 d-block mb-1"></i>
+                  URL未設定
+                </div>
               </div>
             </div>
           </div>
-          <!-- リサイズハンドル（最後以外） -->
-          <div v-if="i < activeSrcs.length - 1"
-               id="resize-handle"
-               @mousedown="startResizeW"
-               :class="{ dragging: isDraggingW }"></div>
-        </template>
+        </div>
       </div>
     </div>
 
@@ -293,26 +264,28 @@
 
 </div><!-- /#app -->
 
-<!-- Scripts -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/axios@1.6.8/dist/axios.min.js"></script>
 
 <script>
-const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
+const { createApp, ref, reactive, computed, onMounted } = Vue;
 
 createApp({
   setup() {
     // ===== State =====
-    const urls = reactive(['', '', '', '', '', '']);
+    const urls       = reactive(['', '', '', '', '', '']);
     const activeSrcs = reactive(['', '', '', '', '', '']);
     const frameWidth  = ref(1280);
     const frameHeight = ref(720);
-    const isDraggingW = ref(false);
+    const frameScale  = ref(90);   // ① デフォルト90%
     const isDraggingH = ref(false);
     const activePreset = ref('PC');
     const toastMsg = ref('');
-    const previewContainer = ref(null);
+
+    // ① スケール後の表示サイズ（クリッピング枠）
+    const scaledWidth  = computed(() => Math.round(frameWidth.value  * frameScale.value / 100));
+    const scaledHeight = computed(() => Math.round(frameHeight.value * frameScale.value / 100));
 
     // ===== Presets =====
     const presets = [
@@ -324,7 +297,7 @@ createApp({
       { label: 'スモール',      w: 320,  icon: 'bi bi-phone-flip' },
     ];
 
-    // ===== URLからGETパラメータを読む =====
+    // ===== GETパラメータ読込 =====
     function loadFromParams() {
       const sp = new URLSearchParams(location.search);
       for (let i = 0; i < 6; i++) {
@@ -333,11 +306,13 @@ createApp({
       }
       const w = parseInt(sp.get('w'));
       const h = parseInt(sp.get('h'));
+      const s = parseInt(sp.get('s'));
       if (w > 0) frameWidth.value  = w;
       if (h > 0) frameHeight.value = h;
+      if (s > 0) frameScale.value  = s;
     }
 
-    // ===== 表示適用 =====
+    // ② blur時に自動適用（表示ボタン廃止）
     function applyUrls() {
       for (let i = 0; i < 6; i++) {
         activeSrcs[i] = urls[i].trim();
@@ -349,23 +324,22 @@ createApp({
       activeSrcs[i] = '';
     }
 
-    // ===== プリセット適用 =====
     function applyPreset(p) {
       frameWidth.value = p.w;
       activePreset.value = p.label;
     }
 
-    // ===== シェアURL生成 & コピー =====
+    // ===== シェアURL（スケールも含む） =====
     function copyShareUrl() {
       const sp = new URLSearchParams();
       urls.forEach((u, i) => { if (u.trim()) sp.set('u' + (i + 1), u.trim()); });
       sp.set('w', frameWidth.value);
       sp.set('h', frameHeight.value);
+      sp.set('s', frameScale.value);
       const shareUrl = location.origin + location.pathname + '?' + sp.toString();
       navigator.clipboard.writeText(shareUrl).then(() => {
         showToast('URLをコピーしました！');
       }).catch(() => {
-        // フォールバック
         const ta = document.createElement('textarea');
         ta.value = shareUrl;
         document.body.appendChild(ta);
@@ -386,26 +360,7 @@ createApp({
       toastInstance.show();
     }
 
-    // ===== リサイズ（幅） =====
-    let startX = 0, startW = 0;
-    function startResizeW(e) {
-      isDraggingW.value = true;
-      startX = e.clientX;
-      startW = frameWidth.value;
-      document.addEventListener('mousemove', onResizeW);
-      document.addEventListener('mouseup', stopResizeW);
-      e.preventDefault();
-    }
-    function onResizeW(e) {
-      frameWidth.value = Math.max(200, startW + (e.clientX - startX));
-    }
-    function stopResizeW() {
-      isDraggingW.value = false;
-      document.removeEventListener('mousemove', onResizeW);
-      document.removeEventListener('mouseup', stopResizeW);
-    }
-
-    // ===== リサイズ（高さ） =====
+    // ===== 高さリサイズ =====
     let startY = 0, startH = 0;
     function startResizeH(e) {
       isDraggingH.value = true;
@@ -424,17 +379,15 @@ createApp({
       document.removeEventListener('mouseup', stopResizeH);
     }
 
-    // ===== Mounted =====
-    onMounted(() => {
-      loadFromParams();
-    });
+    onMounted(() => { loadFromParams(); });
 
     return {
-      urls, activeSrcs, frameWidth, frameHeight,
-      isDraggingW, isDraggingH, activePreset,
-      presets, previewContainer, toastMsg,
+      urls, activeSrcs, frameWidth, frameHeight, frameScale,
+      scaledWidth, scaledHeight,
+      isDraggingH, activePreset,
+      presets, toastMsg,
       applyUrls, clearUrl, applyPreset, copyShareUrl,
-      startResizeW, startResizeH,
+      startResizeH,
     };
   }
 }).mount('#app');
